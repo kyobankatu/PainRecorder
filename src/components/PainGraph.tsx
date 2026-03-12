@@ -25,7 +25,7 @@ interface PainEntry {
   painType: { id: string; name: string };
 }
 
-interface Record {
+interface PainRecord {
   id: string;
   recordedAt: string;
   activityLevel: number;
@@ -50,7 +50,7 @@ function formatDateTime(iso: string): string {
 export default function PainGraph() {
   const [range, setRange] = useState<Range>('7d');
   const [painTypes, setPainTypes] = useState<PainType[]>([]);
-  const [records, setRecords] = useState<Record[]>([]);
+  const [records, setRecords] = useState<PainRecord[]>([]);
   const [visibleTypes, setVisibleTypes] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
@@ -58,7 +58,7 @@ export default function PainGraph() {
     setLoading(true);
     fetch(`/api/records?range=${range}`)
       .then((r) => r.json())
-      .then(({ records: recs, painTypes: pts }: { records: Record[]; painTypes: PainType[] }) => {
+      .then(({ records: recs, painTypes: pts }: { records: PainRecord[]; painTypes: PainType[] }) => {
         setRecords(recs);
         setPainTypes(pts);
         setVisibleTypes(new Set(pts.map((p) => p.id)));
