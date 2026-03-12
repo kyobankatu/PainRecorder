@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
-import { ACTIVITY_LEVELS } from '@/lib/constants';
+import RecordList from '@/components/RecordList';
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions);
@@ -46,43 +46,17 @@ export default async function DashboardPage() {
 
       <div>
         <h2 className="font-semibold text-gray-700 mb-3">最近の記録</h2>
-        {records.length === 0 ? (
-          <p className="text-gray-400 text-sm">まだ記録がありません</p>
-        ) : (
-          <div className="space-y-3">
-            {records.map((rec) => {
-              const activity = ACTIVITY_LEVELS[rec.activityLevel];
-              const date = new Date(rec.recordedAt);
-              return (
-                <div key={rec.id} className="bg-white rounded-xl shadow-sm p-4">
-                  <div className="flex justify-between items-start">
-                    <div className="text-sm text-gray-500">
-                      {date.getFullYear()}/{date.getMonth() + 1}/{date.getDate()}{' '}
-                      {String(date.getHours()).padStart(2, '0')}:
-                      {String(date.getMinutes()).padStart(2, '0')}
-                    </div>
-                    <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">
-                      活動量 {rec.activityLevel}: {activity?.label}
-                    </span>
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {rec.painEntries.map((entry) => (
-                      <span
-                        key={entry.id}
-                        className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded-lg"
-                      >
-                        {entry.painType.name}: <strong>{entry.level}</strong>
-                      </span>
-                    ))}
-                  </div>
-                  {rec.comment && (
-                    <p className="text-sm text-gray-500 mt-2 italic">"{rec.comment}"</p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
+        <RecordList
+          initialRecords={records.map((rec) => ({
+            ...rec,
+            recordedAt: rec.recordedAt.toISOString(),
+            painEntries: rec.painEntries.map((e) => ({
+              id: e.id,
+              level: e.level,
+              painType: e.painType,
+            })),
+          }))}
+        />
       </div>
     </div>
   );

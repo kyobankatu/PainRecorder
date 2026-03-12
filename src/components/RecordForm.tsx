@@ -10,6 +10,18 @@ interface PainType {
   name: string;
 }
 
+interface InitialData {
+  activityLevel: number;
+  comment: string;
+  recordedAt: string;
+  painLevels: Record<string, number>;
+}
+
+interface Props {
+  recordId?: string;
+  initialData?: InitialData;
+}
+
 function toLocalDateTimeString(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   return (
@@ -18,13 +30,13 @@ function toLocalDateTimeString(date: Date): string {
   );
 }
 
-export default function RecordForm() {
+export default function RecordForm({ recordId, initialData }: Props) {
   const router = useRouter();
   const [painTypes, setPainTypes] = useState<PainType[]>([]);
-  const [activityLevel, setActivityLevel] = useState(3);
+  const [activityLevel, setActivityLevel] = useState(initialData?.activityLevel ?? 3);
   const [painLevels, setPainLevels] = useState<Record<string, number>>({});
-  const [comment, setComment] = useState('');
-  const [recordedAt, setRecordedAt] = useState(toLocalDateTimeString(new Date()));
+  const [comment, setComment] = useState(initialData?.comment ?? '');
+  const [recordedAt, setRecordedAt] = useState(initialData?.recordedAt ?? toLocalDateTimeString(new Date()));
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
@@ -35,7 +47,7 @@ export default function RecordForm() {
       .then((data: PainType[]) => {
         setPainTypes(data);
         const initial: Record<string, number> = {};
-        data.forEach((pt) => { initial[pt.id] = 0; });
+        data.forEach((pt) => { initial[pt.id] = initialData?.painLevels[pt.id] ?? 0; });
         setPainLevels(initial);
       });
   }, []);
@@ -51,8 +63,8 @@ export default function RecordForm() {
     }));
 
     try {
-      const res = await fetch('/api/records', {
-        method: 'POST',
+      const res = await fetch(recordId ? `/api/records/${recordId}` : '/api/records', {
+        method: recordId ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ activityLevel, comment, recordedAt, painEntries }),
       });

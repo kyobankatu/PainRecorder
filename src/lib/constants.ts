@@ -1,11 +1,11 @@
 export const ACTIVITY_LEVELS = [
   { value: 0, label: '寝たきり' },
-  { value: 1, label: '横になりながら活動' },
-  { value: 2, label: '座位で活動' },
-  { value: 3, label: '室内歩行' },
-  { value: 4, label: '近所への外出' },
-  { value: 5, label: '積極的な外出' },
-  { value: 6, label: '外で歩行' },
+  { value: 1, label: 'リクライニングソファのみ' },
+  { value: 2, label: 'リクライニングソファ＋立つ' },
+  { value: 3, label: '家の中を動く(四つん這い掃除、立ったまま料理)' },
+  { value: 4, label: '通院(車＋少し歩く)' },
+  { value: 5, label: '杖、松葉杖で外出' },
+  { value: 6, label: '歩行(外)' },
 ] as const;
 
 // Colors from green (0) to red (9) for pain levels

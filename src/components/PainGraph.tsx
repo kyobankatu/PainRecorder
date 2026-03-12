@@ -77,6 +77,10 @@ export default function PainGraph() {
     return point;
   });
 
+  const colorMap = new Map(
+    painTypes.map((pt, i) => [pt.id, GRAPH_LINE_COLORS[i % GRAPH_LINE_COLORS.length]])
+  );
+
   const visiblePainTypes = painTypes.filter((pt) => visibleTypes.has(pt.id));
 
   return (
@@ -97,42 +101,37 @@ export default function PainGraph() {
 
       {painTypes.length > 0 && (
         <div className="flex flex-wrap gap-2">
-          {painTypes.map((pt, i) => (
-            <button
-              key={pt.id}
-              onClick={() =>
-                setVisibleTypes((prev) => {
-                  const next = new Set(prev);
-                  if (next.has(pt.id)) {
-                    next.delete(pt.id);
-                  } else {
-                    next.add(pt.id);
-                  }
-                  return next;
-                })
-              }
-              className="flex items-center gap-1.5 px-3 py-1 rounded-full text-sm border transition-all"
-              style={{
-                borderColor: GRAPH_LINE_COLORS[i % GRAPH_LINE_COLORS.length],
-                backgroundColor: visibleTypes.has(pt.id)
-                  ? GRAPH_LINE_COLORS[i % GRAPH_LINE_COLORS.length] + '22'
-                  : 'white',
-                color: visibleTypes.has(pt.id)
-                  ? GRAPH_LINE_COLORS[i % GRAPH_LINE_COLORS.length]
-                  : '#9ca3af',
-              }}
-            >
-              <span
-                className="w-2 h-2 rounded-full"
+          {painTypes.map((pt) => {
+            const color = colorMap.get(pt.id) ?? '#ccc';
+            return (
+              <button
+                key={pt.id}
+                onClick={() =>
+                  setVisibleTypes((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(pt.id)) {
+                      next.delete(pt.id);
+                    } else {
+                      next.add(pt.id);
+                    }
+                    return next;
+                  })
+                }
+                className="flex items-center gap-1.5 px-3 py-1 rounded-full text-sm border transition-all"
                 style={{
-                  backgroundColor: visibleTypes.has(pt.id)
-                    ? GRAPH_LINE_COLORS[i % GRAPH_LINE_COLORS.length]
-                    : '#d1d5db',
+                  borderColor: color,
+                  backgroundColor: visibleTypes.has(pt.id) ? color + '22' : 'white',
+                  color: visibleTypes.has(pt.id) ? color : '#9ca3af',
                 }}
-              />
-              {pt.name}
-            </button>
-          ))}
+              >
+                <span
+                  className="w-2 h-2 rounded-full"
+                  style={{ backgroundColor: visibleTypes.has(pt.id) ? color : '#d1d5db' }}
+                />
+                {pt.name}
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -160,13 +159,13 @@ export default function PainGraph() {
                 }}
               />
               <Legend />
-              {visiblePainTypes.map((pt, i) => (
+              {visiblePainTypes.map((pt) => (
                 <Line
                   key={pt.id}
                   yAxisId="pain"
                   type="monotone"
                   dataKey={pt.name}
-                  stroke={GRAPH_LINE_COLORS[i % GRAPH_LINE_COLORS.length]}
+                  stroke={colorMap.get(pt.id) ?? '#ccc'}
                   strokeWidth={2}
                   dot={{ r: 4 }}
                   connectNulls
