@@ -1,0 +1,48 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String       @id @default(cuid())
+  username     String       @unique
+  passwordHash String
+  createdAt    DateTime     @default(now())
+  painTypes    PainType[]
+  records      PainRecord[]
+}
+
+model PainType {
+  id          String           @id @default(cuid())
+  userId      String
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  createdAt   DateTime         @default(now())
+  painEntries PainLevelEntry[]
+
+  @@unique([userId, name])
+}
+
+model PainRecord {
+  id            String           @id @default(cuid())
+  userId        String
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activityLevel Int
+  comment       String           @default("")
+  recordedAt    DateTime         @default(now())
+  createdAt     DateTime         @default(now())
+  painEntries   PainLevelEntry[]
+}
+
+model PainLevelEntry {
+  id         String     @id @default(cuid())
+  recordId   String
+  record     PainRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  painTypeId String
+  painType   PainType   @relation(fields: [painTypeId], references: [id], onDelete: Cascade)
+  level      Int
+}
