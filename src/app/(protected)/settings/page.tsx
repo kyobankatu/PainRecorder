@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { ACTIVITY_LEVELS } from '@/lib/constants';
 
 interface PainType {
   id: string;
@@ -103,18 +104,10 @@ export default function SettingsPage() {
       <div className="bg-white rounded-xl shadow-sm p-5">
         <h2 className="font-semibold text-gray-700 mb-2">活動量の目安</h2>
         <div className="space-y-1 text-sm text-gray-600">
-          {[
-            [0, '寝たきり'],
-            [1, '横になりながら活動'],
-            [2, '座位で活動'],
-            [3, '室内歩行'],
-            [4, '近所への外出'],
-            [5, '積極的な外出'],
-            [6, '外で歩行'],
-          ].map(([v, l]) => (
-            <div key={v} className="flex gap-3">
-              <span className="font-mono font-bold text-blue-500 w-4">{v}</span>
-              <span>{l}</span>
+          {ACTIVITY_LEVELS.map((a) => (
+            <div key={a.value} className="flex gap-3">
+              <span className="font-mono font-bold text-blue-500 w-4">{a.value}</span>
+              <span>{a.label}</span>
             </div>
           ))}
         </div>
