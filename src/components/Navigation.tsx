@@ -8,6 +8,7 @@ const navItems = [
   { href: '/dashboard', label: 'ホーム' },
   { href: '/record', label: '記録する' },
   { href: '/graph', label: 'グラフ' },
+  { href: '/memo', label: 'メモ' },
   { href: '/settings', label: '設定' },
 ];
 
