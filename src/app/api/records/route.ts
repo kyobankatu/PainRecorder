@@ -11,10 +11,16 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const range = searchParams.get('range') ?? '7d';
+  const startDateParam = searchParams.get('startDate');
+  const endDateParam = searchParams.get('endDate');
 
   let startDate: Date | undefined;
+  let endDate: Date | undefined;
   const now = new Date();
-  if (range === 'today') {
+
+  if (startDateParam) {
+    startDate = new Date(startDateParam);
+  } else if (range === 'today') {
     startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   } else if (range === '7d') {
     startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -22,10 +28,18 @@ export async function GET(req: NextRequest) {
     startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   }
 
+  if (endDateParam) {
+    endDate = new Date(endDateParam);
+    endDate.setHours(23, 59, 59, 999);
+  }
+
   const records = await prisma.painRecord.findMany({
     where: {
       userId: session.user.id,
-      ...(startDate ? { recordedAt: { gte: startDate } } : {}),
+      recordedAt: {
+        ...(startDate ? { gte: startDate } : {}),
+        ...(endDate ? { lte: endDate } : {}),
+      },
     },
     include: {
       painEntries: {

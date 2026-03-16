@@ -84,20 +84,29 @@ function PrintPreviewContent() {
     const searchParams = useSearchParams();
     const { data: session } = useSession();
     const range = searchParams.get('range') ?? '7d';
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
 
     const [records, setRecords] = useState<PainRecord[]>([]);
     const [painTypes, setPainTypes] = useState<PainType[]>([]);
     const [loading, setLoading] = useState(true);
 
+    const rangeLabel = startDate && endDate
+        ? `${startDate} 〜 ${endDate}`
+        : (RANGE_LABELS[range] ?? range);
+
     useEffect(() => {
-        fetch(`/api/records?range=${range}`)
+        const url = startDate && endDate
+            ? `/api/records?startDate=${startDate}&endDate=${endDate}`
+            : `/api/records?range=${range}`;
+        fetch(url)
             .then((r) => r.json())
             .then(({ records: recs, painTypes: pts }) => {
                 setRecords(recs);
                 setPainTypes(pts);
             })
             .finally(() => setLoading(false));
-    }, [range]);
+    }, [range, startDate, endDate]);
 
     // ── グラフ用データ ──────────────────────────────────────────
 
@@ -227,7 +236,7 @@ function PrintPreviewContent() {
                     <div className="print-section">
                         <h1 className="text-2xl font-bold text-gray-900">痛み記録レポート</h1>
                         <p className="text-sm text-gray-500 mt-1">
-                            期間: {RANGE_LABELS[range] ?? range}　／　出力日時: {formatDT(new Date().toISOString())}
+                            期間: {rangeLabel}　／　出力日時: {formatDT(new Date().toISOString())}
                         </p>
                         {session?.user?.name && (
                             <p className="text-sm text-gray-500">{session.user.name} さん　／　{records.length} 件</p>
