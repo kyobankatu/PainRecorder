@@ -1,0 +1,24 @@
+{
+    "name": "痛み記録",
+    "short_name": "痛み記録",
+    "description": "慢性疼痛トラッカー",
+    "start_url": "/dashboard",
+    "display": "standalone",
+    "background_color": "#f9fafb",
+    "theme_color": "#3b82f6",
+    "orientation": "portrait",
+    "icons": [
+        {
+            "src": "/icon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any"
+        },
+        {
+            "src": "/icon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "maskable"
+        }
+    ]
+}
