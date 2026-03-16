@@ -16,7 +16,7 @@ export async function PUT(
         return NextResponse.json({ error: '見つかりません' }, { status: 404 });
     }
 
-    const { activityLevel, comment, recordedAt, painEntries } = await req.json();
+    const { activityLevel, comment, recordedAt, painEntries, temperature, humidity, pressure } = await req.json();
 
     if (activityLevel === undefined || activityLevel < 0 || 6 < activityLevel) {
         return NextResponse.json({ error: '活動量は0〜6で入力してください' }, { status: 400 });
@@ -33,6 +33,9 @@ export async function PUT(
             activityLevel,
             comment: comment ?? '',
             recordedAt: recordedAt ? new Date(recordedAt) : record.recordedAt,
+            ...(temperature !== undefined ? { temperature } : {}),
+            ...(humidity !== undefined ? { humidity } : {}),
+            ...(pressure !== undefined ? { pressure } : {}),
             painEntries: {
                 create: painEntries.map((e: { painTypeId: string; level: number }) => ({
                     painTypeId: e.painTypeId,

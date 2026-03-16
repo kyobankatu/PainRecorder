@@ -36,6 +36,9 @@ model PainRecord {
   comment       String           @default("")
   recordedAt    DateTime         @default(now())
   createdAt     DateTime         @default(now())
+  temperature   Float?
+  humidity      Float?
+  pressure      Float?
   painEntries   PainLevelEntry[]
 }
 

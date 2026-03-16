@@ -30,6 +30,9 @@ interface PainRecord {
   recordedAt: string;
   activityLevel: number;
   comment: string;
+  temperature: number | null;
+  humidity: number | null;
+  pressure: number | null;
   painEntries: PainEntry[];
 }
 
@@ -67,7 +70,7 @@ export default function PainGraph() {
   }, [range]);
 
   const chartData = records.map((rec) => {
-    const point: Record<string, string | number> = {
+    const point: Record<string, string | number | null> = {
       time: formatDateTime(rec.recordedAt),
       活動量: rec.activityLevel,
     };
@@ -76,6 +79,17 @@ export default function PainGraph() {
     });
     return point;
   });
+
+  const weatherData = records.map((rec) => ({
+    time: formatDateTime(rec.recordedAt),
+    気温: rec.temperature,
+    湿度: rec.humidity,
+    気圧: rec.pressure,
+  }));
+
+  const hasWeather = records.some(
+    (rec) => rec.temperature !== null || rec.humidity !== null || rec.pressure !== null
+  );
 
   const colorMap = new Map(
     painTypes.map((pt, i) => [pt.id, GRAPH_LINE_COLORS[i % GRAPH_LINE_COLORS.length]])
@@ -142,38 +156,90 @@ export default function PainGraph() {
           この期間のデータがありません
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow-sm p-4">
-          <p className="text-xs text-gray-500 mb-1">痛みレベル (左軸: 0〜9) / 活動量 (右軸: 0〜6)</p>
-          <ResponsiveContainer width="100%" height={300}>
-            <ComposedChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="time" tick={{ fontSize: 11 }} />
-              <YAxis yAxisId="pain" domain={[0, 9]} tick={{ fontSize: 11 }} />
-              <YAxis yAxisId="activity" orientation="right" domain={[0, 6]} tick={{ fontSize: 11 }} />
-              <Tooltip
-                formatter={(value: number, name: string) => {
-                  if (name === '活動量') {
-                    return [ACTIVITY_LEVELS[value]?.label ?? value, name];
-                  }
-                  return [value, name];
-                }}
-              />
-              <Legend />
-              {visiblePainTypes.map((pt) => (
-                <Line
-                  key={pt.id}
-                  yAxisId="pain"
-                  type="monotone"
-                  dataKey={pt.name}
-                  stroke={colorMap.get(pt.id) ?? '#ccc'}
-                  strokeWidth={2}
-                  dot={{ r: 4 }}
-                  connectNulls
+        <div className="space-y-4">
+          <div className="bg-white rounded-xl shadow-sm p-4">
+            <p className="text-xs text-gray-500 mb-1">痛みレベル (左軸: 0〜9) / 活動量 (右軸: 0〜6)</p>
+            <ResponsiveContainer width="100%" height={300}>
+              <ComposedChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="time" tick={{ fontSize: 11 }} />
+                <YAxis yAxisId="pain" domain={[0, 9]} tick={{ fontSize: 11 }} />
+                <YAxis yAxisId="activity" orientation="right" domain={[0, 6]} tick={{ fontSize: 11 }} />
+                <Tooltip
+                  formatter={(value: number, name: string) => {
+                    if (name === '活動量') {
+                      return [ACTIVITY_LEVELS[value]?.label ?? value, name];
+                    }
+                    return [value, name];
+                  }}
                 />
-              ))}
-              <Bar yAxisId="activity" dataKey="活動量" fill="#93c5fd" opacity={0.5} />
-            </ComposedChart>
-          </ResponsiveContainer>
+                <Legend />
+                {visiblePainTypes.map((pt) => (
+                  <Line
+                    key={pt.id}
+                    yAxisId="pain"
+                    type="monotone"
+                    dataKey={pt.name}
+                    stroke={colorMap.get(pt.id) ?? '#ccc'}
+                    strokeWidth={2}
+                    dot={{ r: 4 }}
+                    connectNulls
+                  />
+                ))}
+                <Bar yAxisId="activity" dataKey="活動量" fill="#93c5fd" opacity={0.5} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+
+          {hasWeather && (
+            <div className="bg-white rounded-xl shadow-sm p-4">
+              <p className="text-xs text-gray-500 mb-1">気温 °C (左軸) / 湿度 % · 気圧 hPa (右軸)</p>
+              <ResponsiveContainer width="100%" height={220}>
+                <ComposedChart data={weatherData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="time" tick={{ fontSize: 11 }} />
+                  <YAxis yAxisId="temp" tick={{ fontSize: 11 }} unit="°" />
+                  <YAxis yAxisId="hum_pres" orientation="right" tick={{ fontSize: 11 }} />
+                  <Tooltip
+                    formatter={(value: number, name: string) => {
+                      if (name === '気温') { return [`${value} °C`, name]; }
+                      if (name === '湿度') { return [`${value} %`, name]; }
+                      if (name === '気圧') { return [`${value} hPa`, name]; }
+                      return [value, name];
+                    }}
+                  />
+                  <Legend />
+                  <Line
+                    yAxisId="temp"
+                    type="monotone"
+                    dataKey="気温"
+                    stroke="#f97316"
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                    connectNulls
+                  />
+                  <Line
+                    yAxisId="hum_pres"
+                    type="monotone"
+                    dataKey="湿度"
+                    stroke="#22d3ee"
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                    connectNulls
+                  />
+                  <Line
+                    yAxisId="hum_pres"
+                    type="monotone"
+                    dataKey="気圧"
+                    stroke="#a78bfa"
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                    connectNulls
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </div>
       )}
     </div>

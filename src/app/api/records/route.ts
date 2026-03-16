@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
   }
 
-  const { activityLevel, comment, recordedAt, painEntries } = await req.json();
+  const { activityLevel, comment, recordedAt, painEntries, temperature, humidity, pressure } = await req.json();
 
   if (activityLevel === undefined || activityLevel < 0 || activityLevel > 6) {
     return NextResponse.json({ error: '活動量は0〜6で入力してください' }, { status: 400 });
@@ -64,6 +64,9 @@ export async function POST(req: NextRequest) {
       activityLevel,
       comment: comment ?? '',
       recordedAt: recordedAt ? new Date(recordedAt) : new Date(),
+      temperature: temperature ?? null,
+      humidity: humidity ?? null,
+      pressure: pressure ?? null,
       painEntries: {
         create: painEntries.map((e: { painTypeId: string; level: number }) => ({
           painTypeId: e.painTypeId,
