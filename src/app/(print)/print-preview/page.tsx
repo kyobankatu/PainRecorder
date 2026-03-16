@@ -78,6 +78,20 @@ function meanPain(rec: PainRecord): number | null {
     return rec.painEntries.reduce((s, e) => s + e.level, 0) / rec.painEntries.length;
 }
 
+function linearRegression(points: { t: number; y: number }[]): { slope: number; r2: number } | null {
+    const n = points.length;
+    if (n < 2) { return null; }
+    const mx = points.reduce((a, p) => a + p.t, 0) / n;
+    const my = points.reduce((a, p) => a + p.y, 0) / n;
+    const ssxx = points.reduce((a, p) => a + (p.t - mx) ** 2, 0);
+    const ssxy = points.reduce((a, p) => a + (p.t - mx) * (p.y - my), 0);
+    const ssyy = points.reduce((a, p) => a + (p.y - my) ** 2, 0);
+    if (ssxx === 0) { return null; }
+    const slope = ssxy / ssxx;
+    const r2 = ssyy === 0 ? 1 : (ssxy ** 2) / (ssxx * ssyy);
+    return { slope, r2: Math.round(r2 * 100) / 100 };
+}
+
 // ── メインコンテンツ ──────────────────────────────────────────────
 
 function PrintPreviewContent() {
@@ -139,14 +153,33 @@ function PrintPreviewContent() {
 
     // ── 統計 ────────────────────────────────────────────────────
 
-    const avgByType = painTypes.map((pt) => {
+    // タイプ別 平均・最小・最大・件数・推移
+    const statsByType = painTypes.map((pt) => {
         const levels = records.flatMap((rec) =>
             rec.painEntries.filter((e) => e.painTypeId === pt.id).map((e) => e.level)
         );
-        const avg = levels.length === 0 ? null : levels.reduce((a, b) => a + b, 0) / levels.length;
-        return { id: pt.id, name: pt.name, avg };
+        if (levels.length === 0) { return { id: pt.id, name: pt.name, avg: null, min: null, max: null, count: 0, trend: null }; }
+        const avg = levels.reduce((a, b) => a + b, 0) / levels.length;
+        const dailyMap = new Map<string, number[]>();
+        records.forEach((rec) => {
+            const entry = rec.painEntries.find((e) => e.painTypeId === pt.id);
+            if (entry === undefined) { return; }
+            const d = new Date(rec.recordedAt);
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            const arr = dailyMap.get(key) ?? [];
+            arr.push(entry.level);
+            dailyMap.set(key, arr);
+        });
+        const points = Array.from(dailyMap.entries())
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([key, vals]) => ({
+                t: new Date(key).getTime() / (1000 * 60 * 60 * 24),
+                y: vals.reduce((a, b) => a + b, 0) / vals.length,
+            }));
+        return { id: pt.id, name: pt.name, avg, min: Math.min(...levels), max: Math.max(...levels), count: levels.length, trend: linearRegression(points) };
     });
 
+    // 日別平均
     const painByDate = new Map<string, number[]>();
     records.forEach((rec) => {
         const date = formatDate(rec.recordedAt);
@@ -158,13 +191,34 @@ function PrintPreviewContent() {
         }
     });
     let worstDay: { date: string; avg: number } | null = null as { date: string; avg: number } | null;
+    let bestDay: { date: string; avg: number } | null = null as { date: string; avg: number } | null;
     painByDate.forEach((vals, date) => {
         const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
         if (worstDay === null || worstDay.avg < avg) {
             worstDay = { date, avg: Math.round(avg * 10) / 10 };
         }
+        if (bestDay === null || bestDay.avg > avg) {
+            bestDay = { date, avg: Math.round(avg * 10) / 10 };
+        }
     });
 
+    // 期間サマリー
+    const firstDate = records.length > 0 ? new Date(records[0].recordedAt) : null;
+    const lastDate = records.length > 0 ? new Date(records[records.length - 1].recordedAt) : null;
+    const spanDays = firstDate && lastDate
+        ? Math.max(1, Math.round((lastDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24)) + 1)
+        : null;
+    const recordedDayCount = painByDate.size;
+
+    // 活動量の分布
+    const maxActivityCount = Math.max(1, ...ACTIVITY_LEVELS.map((a) => records.filter((rec) => rec.activityLevel === a.value).length));
+    const activityDist = ACTIVITY_LEVELS.map((a) => ({
+        value: a.value,
+        label: a.label,
+        count: records.filter((rec) => rec.activityLevel === a.value).length,
+    }));
+
+    // 相関
     const actXs: number[] = [];
     const actYs: number[] = [];
     records.forEach((rec) => {
@@ -326,81 +380,142 @@ function PrintPreviewContent() {
                             )}
 
                             {/* 統計サマリー */}
-                            <div className="print-section grid grid-cols-3 gap-4">
-                                {/* タイプ別平均 */}
+                            <div className="print-section space-y-4">
+                                <h2 className="text-base font-semibold text-gray-700">統計サマリー</h2>
+
+                                {/* 期間サマリー */}
+                                <div className="grid grid-cols-3 gap-3">
+                                    <div className="bg-blue-50 rounded-lg p-3 text-center">
+                                        <p className="text-xl font-bold text-blue-500">{records.length}</p>
+                                        <p className="text-xs text-gray-500 mt-0.5">総記録数</p>
+                                    </div>
+                                    <div className="bg-blue-50 rounded-lg p-3 text-center">
+                                        <p className="text-xl font-bold text-blue-500">{recordedDayCount}</p>
+                                        <p className="text-xs text-gray-500 mt-0.5">記録した日数</p>
+                                    </div>
+                                    <div className="bg-blue-50 rounded-lg p-3 text-center">
+                                        <p className="text-xl font-bold text-blue-500">
+                                            {spanDays !== null ? (records.length / spanDays).toFixed(1) : '—'}
+                                        </p>
+                                        <p className="text-xs text-gray-500 mt-0.5">平均記録/日</p>
+                                    </div>
+                                </div>
+
+                                {/* タイプ別統計テーブル */}
                                 <div className="bg-gray-50 rounded-lg p-4">
-                                    <h3 className="text-sm font-semibold text-gray-700 mb-3">痛みタイプ別 平均レベル</h3>
-                                    <div className="space-y-2">
-                                        {avgByType.map(({ id, name, avg }) => {
-                                            const color = colorMap.get(id) ?? '#ccc';
-                                            const pct = avg !== null ? (avg / 9) * 100 : 0;
-                                            return (
-                                                <div key={id}>
-                                                    <div className="flex justify-between text-xs mb-0.5">
-                                                        <span className="text-gray-700">{name}</span>
-                                                        <span className="font-mono font-semibold" style={{ color }}>
-                                                            {avg !== null ? avg.toFixed(1) : '—'} / 9
-                                                        </span>
-                                                    </div>
-                                                    <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                                                        <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-
-                                {/* 最も痛みが強かった日 & 活動量との相関 */}
-                                <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                                    <div>
-                                        <h3 className="text-sm font-semibold text-gray-700 mb-2">最も痛みが強かった日</h3>
-                                        {worstDay !== null ? (
-                                            <p className="text-sm">
-                                                <span className="font-semibold text-red-500">{worstDay.date}</span>
-                                                <span className="text-gray-500 ml-2 text-xs">平均 {worstDay.avg}</span>
-                                            </p>
-                                        ) : (
-                                            <p className="text-xs text-gray-400">データなし</p>
-                                        )}
-                                    </div>
-                                    <div>
-                                        <h3 className="text-sm font-semibold text-gray-700 mb-2">活動量との相関</h3>
-                                        {actCorr !== null ? (
-                                            <p className="text-sm">
-                                                <span className="font-mono font-bold text-gray-800">
-                                                    r = {0 <= actCorr ? '+' : ''}{actCorr.toFixed(2)}
-                                                </span>
-                                                <span className="text-xs text-gray-500 ml-2">{correlationLabel(actCorr)}</span>
-                                            </p>
-                                        ) : (
-                                            <p className="text-xs text-gray-400">データが3件以上必要</p>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* 気象相関 */}
-                                {hasWeatherCorr && (
-                                    <div className="bg-gray-50 rounded-lg p-4">
-                                        <h3 className="text-sm font-semibold text-gray-700 mb-3">気象と痛みの相関</h3>
-                                        <div className="space-y-2">
-                                            {weatherCorr.map(({ label, unit, r, n }) => {
-                                                if (r === null) { return null; }
+                                    <h3 className="text-sm font-semibold text-gray-700 mb-3">痛みタイプ別 統計・推移</h3>
+                                    <table className="w-full text-xs border-collapse">
+                                        <thead>
+                                            <tr className="bg-gray-200">
+                                                <th className="border border-gray-300 px-2 py-1 text-left">タイプ</th>
+                                                <th className="border border-gray-300 px-2 py-1 text-center">件数</th>
+                                                <th className="border border-gray-300 px-2 py-1 text-center">平均</th>
+                                                <th className="border border-gray-300 px-2 py-1 text-center">最小</th>
+                                                <th className="border border-gray-300 px-2 py-1 text-center">最大</th>
+                                                <th className="border border-gray-300 px-2 py-1 text-center">傾向</th>
+                                                <th className="border border-gray-300 px-2 py-1 text-center">傾き/日</th>
+                                                <th className="border border-gray-300 px-2 py-1 text-center">R²</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {statsByType.map(({ id, name, avg, min, max, count, trend }) => {
+                                                const color = colorMap.get(id) ?? '#ccc';
                                                 return (
-                                                    <div key={label} className="text-xs">
-                                                        <span className="text-gray-500 w-8 inline-block">{label}</span>
-                                                        <span className="font-mono font-bold text-gray-800 ml-2">
-                                                            {0 <= r ? '+' : ''}{r.toFixed(2)}
-                                                        </span>
-                                                        <span className="text-gray-400 ml-2">{correlationLabel(r)}</span>
-                                                        <span className="text-gray-300 ml-1">({n}件)</span>
-                                                    </div>
+                                                    <tr key={id}>
+                                                        <td className="border border-gray-300 px-2 py-1 font-medium" style={{ color }}>{name}</td>
+                                                        <td className="border border-gray-300 px-2 py-1 text-center text-gray-600">{count}</td>
+                                                        <td className="border border-gray-300 px-2 py-1 text-center font-mono">{avg !== null ? avg.toFixed(1) : '—'}</td>
+                                                        <td className="border border-gray-300 px-2 py-1 text-center text-blue-500 font-mono">{min ?? '—'}</td>
+                                                        <td className="border border-gray-300 px-2 py-1 text-center text-red-400 font-mono">{max ?? '—'}</td>
+                                                        <td className="border border-gray-300 px-2 py-1 text-center">
+                                                            {trend === null ? '—' : trend.slope < -0.05 ? '改善↓' : trend.slope > 0.05 ? '悪化↑' : '横ばい→'}
+                                                        </td>
+                                                        <td className="border border-gray-300 px-2 py-1 text-center font-mono text-gray-600">
+                                                            {trend !== null ? `${0 <= trend.slope ? '+' : ''}${trend.slope.toFixed(3)}` : '—'}
+                                                        </td>
+                                                        <td className="border border-gray-300 px-2 py-1 text-center font-mono text-gray-600">
+                                                            {trend !== null ? trend.r2.toFixed(2) : '—'}
+                                                        </td>
+                                                    </tr>
                                                 );
                                             })}
+                                        </tbody>
+                                    </table>
+                                    <p className="text-xs text-gray-400 mt-1">傾き: 1日あたりの痛みレベル変化　R²: 傾向の信頼度（1に近いほど明確）</p>
+                                </div>
+
+                                {/* 最良・最悪の日 / 相関 */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-3">
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div className="bg-red-50 rounded-lg p-3">
+                                                <p className="text-xs font-medium text-gray-500 mb-1">最も痛みが強かった日</p>
+                                                {worstDay !== null ? (
+                                                    <>
+                                                        <p className="font-semibold text-red-500">{worstDay.date}</p>
+                                                        <p className="text-xs text-gray-500">平均 {worstDay.avg} / 9</p>
+                                                    </>
+                                                ) : <p className="text-xs text-gray-400">データなし</p>}
+                                            </div>
+                                            <div className="bg-green-50 rounded-lg p-3">
+                                                <p className="text-xs font-medium text-gray-500 mb-1">最も楽だった日</p>
+                                                {bestDay !== null ? (
+                                                    <>
+                                                        <p className="font-semibold text-green-600">{bestDay.date}</p>
+                                                        <p className="text-xs text-gray-500">平均 {bestDay.avg} / 9</p>
+                                                    </>
+                                                ) : <p className="text-xs text-gray-400">データなし</p>}
+                                            </div>
                                         </div>
-                                        <p className="text-xs text-gray-300 mt-2">r: ピアソン相関係数</p>
+                                        <div className="bg-gray-50 rounded-lg p-3">
+                                            <p className="text-xs font-medium text-gray-700 mb-2">活動量の分布</p>
+                                            <div className="space-y-1">
+                                                {activityDist.filter((a) => a.count > 0).map((a) => (
+                                                    <div key={a.value} className="flex items-center gap-2">
+                                                        <span className="font-mono text-xs text-blue-500 w-3 shrink-0">{a.value}</span>
+                                                        <div className="flex-1 h-3 bg-gray-200 rounded-full overflow-hidden">
+                                                            <div className="h-full bg-blue-300 rounded-full" style={{ width: `${(a.count / maxActivityCount) * 100}%` }} />
+                                                        </div>
+                                                        <span className="text-xs text-gray-400 w-4 text-right shrink-0">{a.count}</span>
+                                                        <span className="text-xs text-gray-400 shrink-0">{a.label}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
                                     </div>
-                                )}
+                                    <div className="space-y-3">
+                                        <div className="bg-gray-50 rounded-lg p-3">
+                                            <p className="text-xs font-medium text-gray-700 mb-2">活動量との相関</p>
+                                            {actCorr !== null ? (
+                                                <p className="text-sm">
+                                                    <span className="font-mono font-bold text-gray-800">r = {0 <= actCorr ? '+' : ''}{actCorr.toFixed(2)}</span>
+                                                    <span className="text-xs text-gray-500 ml-2">{correlationLabel(actCorr)}</span>
+                                                </p>
+                                            ) : (
+                                                <p className="text-xs text-gray-400">データが3件以上必要</p>
+                                            )}
+                                        </div>
+                                        {hasWeatherCorr && (
+                                            <div className="bg-gray-50 rounded-lg p-3">
+                                                <p className="text-xs font-medium text-gray-700 mb-2">気象と痛みの相関</p>
+                                                <div className="space-y-1.5">
+                                                    {weatherCorr.map(({ label, unit, r, n }) => {
+                                                        if (r === null) { return null; }
+                                                        return (
+                                                            <div key={label} className="text-xs flex items-center gap-2">
+                                                                <span className="text-gray-500 w-8">{label}</span>
+                                                                <span className="font-mono font-bold text-gray-800">{0 <= r ? '+' : ''}{r.toFixed(2)}</span>
+                                                                <span className="text-gray-400">{correlationLabel(r)}</span>
+                                                                <span className="text-gray-300 ml-auto">({n}件)</span>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                                <p className="text-xs text-gray-300 mt-1">r: ピアソン相関係数</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
 
                             {/* データテーブル */}

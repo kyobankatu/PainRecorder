@@ -56,29 +56,183 @@ function formatDate(iso: string): string {
     return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
+function csvCell(value: string | number): string {
+    const s = String(value);
+    return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
 function downloadCsv(records: PainRecord[], painTypes: PainType[], range: string) {
+    const lines: string[] = [];
+
+    // ── 期間サマリー ──────────────────────────────────────────────
+    const painByDate = new Map<string, number[]>();
+    records.forEach((rec) => {
+        const d = new Date(rec.recordedAt);
+        const date = `${d.getMonth() + 1}/${d.getDate()}`;
+        const mp = rec.painEntries.length > 0
+            ? rec.painEntries.reduce((s, e) => s + e.level, 0) / rec.painEntries.length
+            : null;
+        if (mp !== null) {
+            const arr = painByDate.get(date) ?? [];
+            arr.push(mp);
+            painByDate.set(date, arr);
+        }
+    });
+    const firstRec = records[0];
+    const lastRec = records[records.length - 1];
+    const spanDays = firstRec && lastRec
+        ? Math.max(1, Math.round((new Date(lastRec.recordedAt).getTime() - new Date(firstRec.recordedAt).getTime()) / (1000 * 60 * 60 * 24)) + 1)
+        : 1;
+    lines.push('【期間サマリー】');
+    lines.push(`総記録数,${records.length}`);
+    lines.push(`記録した日数,${painByDate.size}`);
+    lines.push(`平均記録/日,${(records.length / spanDays).toFixed(1)}`);
+    lines.push('');
+
+    // ── タイプ別統計・推移 ────────────────────────────────────────
+    lines.push('【痛みタイプ別統計・推移】');
+    lines.push('タイプ,件数,平均,最小,最大,傾向,傾き/日,R²');
+    painTypes.forEach((pt) => {
+        const levels = records.flatMap((rec) =>
+            rec.painEntries.filter((e) => e.painTypeId === pt.id).map((e) => e.level)
+        );
+        if (levels.length === 0) {
+            lines.push([csvCell(pt.name), 0, '', '', '', '', '', ''].join(','));
+            return;
+        }
+        const avg = levels.reduce((a, b) => a + b, 0) / levels.length;
+        const min = Math.min(...levels);
+        const max = Math.max(...levels);
+        const dailyMap = new Map<string, number[]>();
+        records.forEach((rec) => {
+            const entry = rec.painEntries.find((e) => e.painTypeId === pt.id);
+            if (entry === undefined) { return; }
+            const d = new Date(rec.recordedAt);
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            const arr = dailyMap.get(key) ?? [];
+            arr.push(entry.level);
+            dailyMap.set(key, arr);
+        });
+        const points = Array.from(dailyMap.entries())
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([key, vals]) => ({
+                t: new Date(key).getTime() / (1000 * 60 * 60 * 24),
+                y: vals.reduce((a, b) => a + b, 0) / vals.length,
+            }));
+        let slope = '';
+        let r2 = '';
+        let trend = '';
+        if (points.length >= 2) {
+            const n = points.length;
+            const mx = points.reduce((a, p) => a + p.t, 0) / n;
+            const my = points.reduce((a, p) => a + p.y, 0) / n;
+            const ssxx = points.reduce((a, p) => a + (p.t - mx) ** 2, 0);
+            const ssxy = points.reduce((a, p) => a + (p.t - mx) * (p.y - my), 0);
+            const ssyy = points.reduce((a, p) => a + (p.y - my) ** 2, 0);
+            if (ssxx !== 0) {
+                const s = ssxy / ssxx;
+                const r = ssyy === 0 ? 1 : (ssxy ** 2) / (ssxx * ssyy);
+                slope = `${0 <= s ? '+' : ''}${s.toFixed(3)}`;
+                r2 = r.toFixed(2);
+                trend = s < -0.05 ? '改善' : s > 0.05 ? '悪化' : '横ばい';
+            }
+        }
+        lines.push([csvCell(pt.name), levels.length, avg.toFixed(1), min, max, trend, slope, r2].join(','));
+    });
+    lines.push('');
+
+    // ── 最良・最悪の日 ────────────────────────────────────────────
+    let worstDay = '';
+    let worstAvg = -Infinity;
+    let bestDay = '';
+    let bestAvg = Infinity;
+    painByDate.forEach((vals, date) => {
+        const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+        if (avg > worstAvg) { worstAvg = avg; worstDay = date; }
+        if (avg < bestAvg) { bestAvg = avg; bestDay = date; }
+    });
+    lines.push('【最も痛みが強かった日】');
+    lines.push(`日付,${worstDay || '—'},平均,${worstAvg !== -Infinity ? (Math.round(worstAvg * 10) / 10) : '—'}`);
+    lines.push('【最も楽だった日】');
+    lines.push(`日付,${bestDay || '—'},平均,${bestAvg !== Infinity ? (Math.round(bestAvg * 10) / 10) : '—'}`);
+    lines.push('');
+
+    // ── 活動量の分布 ──────────────────────────────────────────────
+    lines.push('【活動量の分布】');
+    lines.push('レベル,ラベル,件数');
+    ACTIVITY_LEVELS.forEach((a) => {
+        const count = records.filter((rec) => rec.activityLevel === a.value).length;
+        if (count > 0) {
+            lines.push([a.value, csvCell(a.label), count].join(','));
+        }
+    });
+    lines.push('');
+
+    // ── 相関 ──────────────────────────────────────────────────────
+    const actXs: number[] = [];
+    const actYs: number[] = [];
+    records.forEach((rec) => {
+        const mp = rec.painEntries.length > 0 ? rec.painEntries.reduce((s, e) => s + e.level, 0) / rec.painEntries.length : null;
+        if (mp !== null) { actXs.push(rec.activityLevel); actYs.push(mp); }
+    });
+    lines.push('【相関】');
+    lines.push('項目,r,解釈');
+    const pearsonFn = (xs: number[], ys: number[]): number | null => {
+        if (xs.length < 3) { return null; }
+        const n = xs.length;
+        const mx = xs.reduce((a, b) => a + b, 0) / n;
+        const my = ys.reduce((a, b) => a + b, 0) / n;
+        const num = xs.reduce((acc, x, i) => acc + (x - mx) * (ys[i] - my), 0);
+        const den = Math.sqrt(xs.reduce((acc, x) => acc + (x - mx) ** 2, 0) * ys.reduce((acc, y) => acc + (y - my) ** 2, 0));
+        if (den === 0) { return null; }
+        return Math.round((num / den) * 100) / 100;
+    };
+    const corrLabel = (r: number) => {
+        const abs = Math.abs(r);
+        const dir = 0 <= r ? '正' : '負';
+        if (abs < 0.2) { return 'ほぼ相関なし'; }
+        if (abs < 0.4) { return `弱い${dir}の相関`; }
+        if (abs < 0.7) { return `中程度の${dir}の相関`; }
+        return `強い${dir}の相関`;
+    };
+    const actR = pearsonFn(actXs, actYs);
+    lines.push(['活動量', actR !== null ? `${0 <= actR ? '+' : ''}${actR.toFixed(2)}` : '—', actR !== null ? corrLabel(actR) : 'データ不足'].join(','));
+    (['temperature', 'humidity', 'pressure'] as const).forEach((key) => {
+        const label = key === 'temperature' ? '気温' : key === 'humidity' ? '湿度' : '気圧';
+        const pairs = records
+            .map((rec) => ({ w: rec[key], p: rec.painEntries.length > 0 ? rec.painEntries.reduce((s, e) => s + e.level, 0) / rec.painEntries.length : null }))
+            .filter((x): x is { w: number; p: number } => x.w !== null && x.p !== null);
+        const r = pearsonFn(pairs.map((x) => x.w), pairs.map((x) => x.p));
+        lines.push([label, r !== null ? `${0 <= r ? '+' : ''}${r.toFixed(2)}` : '—', r !== null ? corrLabel(r) : 'データ不足'].join(','));
+    });
+    lines.push('');
+
+    // ── 記録一覧 ──────────────────────────────────────────────────
+    lines.push('【記録一覧】');
     const headers = [
         '日時', '活動量', '活動量ラベル',
         '気温(°C)', '湿度(%)', '気圧(hPa)', 'コメント',
-        ...painTypes.map((pt) => pt.name),
+        ...painTypes.map((pt) => csvCell(pt.name)),
     ];
-    const rows = records.map((rec) => {
-        const cells: (string | number) [] = [
+    lines.push(headers.join(','));
+    records.forEach((rec) => {
+        const cells: (string | number)[] = [
             formatDateTime(rec.recordedAt),
             rec.activityLevel,
-            ACTIVITY_LEVELS.find((a) => a.value === rec.activityLevel)?.label ?? '',
+            csvCell(ACTIVITY_LEVELS.find((a) => a.value === rec.activityLevel)?.label ?? ''),
             rec.temperature ?? '',
             rec.humidity ?? '',
             rec.pressure ?? '',
-            `"${rec.comment.replace(/"/g, '""')}"`,
+            csvCell(rec.comment),
             ...painTypes.map((pt) => {
                 const entry = rec.painEntries.find((e) => e.painTypeId === pt.id);
                 return entry?.level ?? '';
             }),
         ];
-        return cells.join(',');
+        lines.push(cells.join(','));
     });
-    const csv = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
+
+    const csv = '\uFEFF' + lines.join('\r\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
