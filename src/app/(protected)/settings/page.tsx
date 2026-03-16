@@ -14,6 +14,18 @@ export default function SettingsPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const [reminderEnabled, setReminderEnabled] = useState(false);
+  const [reminderTime, setReminderTime] = useState('20:00');
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission>('default');
+
+  useEffect(() => {
+    setReminderEnabled(localStorage.getItem('reminderEnabled') === 'true');
+    setReminderTime(localStorage.getItem('reminderTime') ?? '20:00');
+    if ('Notification' in window) {
+      setNotifPermission(Notification.permission);
+    }
+  }, []);
+
   async function fetchPainTypes() {
     const res = await fetch('/api/pain-types');
     const data = await res.json();
@@ -98,6 +110,65 @@ export default function SettingsPage() {
               </li>
             ))}
           </ul>
+        )}
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm p-5 space-y-4">
+        <h2 className="font-semibold text-gray-700">記録リマインダー</h2>
+
+        <div className="flex items-center justify-between">
+          <label className="text-sm text-gray-700">リマインダーを有効にする</label>
+          <button
+            type="button"
+            onClick={() => {
+              const next = !reminderEnabled;
+              setReminderEnabled(next);
+              localStorage.setItem('reminderEnabled', String(next));
+            }}
+            className={`w-11 h-6 rounded-full transition-colors relative ${reminderEnabled ? 'bg-blue-500' : 'bg-gray-300'}`}
+          >
+            <span className={`absolute top-1 left-0 w-4 h-4 bg-white rounded-full shadow transition-transform ${reminderEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+          </button>
+        </div>
+
+        {reminderEnabled && (
+          <div className="flex items-center gap-3">
+            <label className="text-sm text-gray-700">通知時刻</label>
+            <input
+              type="time"
+              value={reminderTime}
+              onChange={(e) => {
+                setReminderTime(e.target.value);
+                localStorage.setItem('reminderTime', e.target.value);
+              }}
+              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        )}
+
+        {reminderEnabled && notifPermission !== 'granted' && (
+          <div>
+            <p className="text-xs text-gray-500 mb-2">
+              {notifPermission === 'denied'
+                ? 'ブラウザの設定で通知を許可してください'
+                : '通知を受け取るには許可が必要です'}
+            </p>
+            {notifPermission !== 'denied' && (
+              <button
+                type="button"
+                onClick={() => {
+                  Notification.requestPermission().then((p) => setNotifPermission(p));
+                }}
+                className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded-lg transition-colors"
+              >
+                通知を許可する
+              </button>
+            )}
+          </div>
+        )}
+
+        {reminderEnabled && notifPermission === 'granted' && (
+          <p className="text-xs text-green-600">通知が有効です</p>
         )}
       </div>
 

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import RecordList from '@/components/RecordList';
+import ReminderBanner from '@/components/ReminderBanner';
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions);
@@ -18,8 +19,12 @@ export default async function DashboardPage() {
 
   const totalRecords = await prisma.painRecord.count({ where: { userId: session.user.id } });
 
+  const latestRecordedAt = records[0]?.recordedAt.toISOString() ?? null;
+
   return (
     <div className="space-y-6">
+      <ReminderBanner latestRecordedAt={latestRecordedAt} />
+
       <div>
         <h1 className="text-2xl font-bold text-gray-800">
           こんにちは、{session.user.name}さん

@@ -13,6 +13,11 @@ self.addEventListener('activate', (event) => {
     self.clients.claim();
 });
 
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+    event.waitUntil(clients.openWindow('/record'));
+});
+
 self.addEventListener('fetch', (event) => {
     if (event.request.method !== 'GET') {
         return;

@@ -64,6 +64,7 @@ export default function RecordForm({ recordId, initialData }: Props) {
     const [manualTemp, setManualTemp] = useState('');
     const [manualHumidity, setManualHumidity] = useState('');
     const [manualPressure, setManualPressure] = useState('');
+    const [copying, setCopying] = useState(false);
 
     useEffect(() => {
         fetch('/api/pain-types')
@@ -112,6 +113,25 @@ export default function RecordForm({ recordId, initialData }: Props) {
             }
         );
     }, [apiWeather]);
+
+    async function handleCopyLast() {
+        setCopying(true);
+        try {
+            const res = await fetch('/api/records/latest');
+            const rec = await res.json();
+            if (!rec) { return; }
+            setActivityLevel(rec.activityLevel);
+            setPainLevels((prev) => {
+                const next = { ...prev };
+                rec.painEntries.forEach((e: { painTypeId: string; level: number }) => {
+                    next[e.painTypeId] = e.level;
+                });
+                return next;
+            });
+        } finally {
+            setCopying(false);
+        }
+    }
 
     function setFieldMode(field: 'temperature' | 'humidity' | 'pressure', mode: FieldMode) {
         if (field === 'temperature') { setTempMode(mode); }
@@ -208,6 +228,17 @@ export default function RecordForm({ recordId, initialData }: Props) {
 
     return (
         <form onSubmit={handleSubmit} className="space-y-6">
+            {!recordId && (
+                <button
+                    type="button"
+                    onClick={handleCopyLast}
+                    disabled={copying}
+                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-blue-300 text-blue-500 hover:bg-blue-50 disabled:opacity-50 transition-colors text-sm font-medium"
+                >
+                    {copying ? '読み込み中...' : '前回の記録をコピーして入力'}
+                </button>
+            )}
+
             <div className="bg-white rounded-xl shadow-sm p-5 space-y-4">
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">記録日時</label>
