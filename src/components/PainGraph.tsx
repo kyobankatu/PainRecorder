@@ -55,6 +55,40 @@ function formatDate(iso: string): string {
     return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
+function downloadCsv(records: PainRecord[], painTypes: PainType[], range: Range) {
+    const headers = [
+        '日時', '活動量', '活動量ラベル',
+        '気温(°C)', '湿度(%)', '気圧(hPa)', 'コメント',
+        ...painTypes.map((pt) => pt.name),
+    ];
+    const rows = records.map((rec) => {
+        const cells: (string | number) [] = [
+            formatDateTime(rec.recordedAt),
+            rec.activityLevel,
+            ACTIVITY_LEVELS.find((a) => a.value === rec.activityLevel)?.label ?? '',
+            rec.temperature ?? '',
+            rec.humidity ?? '',
+            rec.pressure ?? '',
+            `"${rec.comment.replace(/"/g, '""')}"`,
+            ...painTypes.map((pt) => {
+                const entry = rec.painEntries.find((e) => e.painTypeId === pt.id);
+                return entry?.level ?? '';
+            }),
+        ];
+        return cells.join(',');
+    });
+    const csv = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `pain-record-${range}-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
 /** ピアソン相関係数。データが3点未満またはどちらかの分散が0の場合はnull */
 function pearson(xs: number[], ys: number[]): number | null {
     if (xs.length < 3) { return null; }
@@ -124,16 +158,19 @@ export default function PainGraph() {
         return point;
     });
 
-    const weatherData = records.map((rec) => ({
+    const tempHumData = records.map((rec) => ({
         time: formatDateTime(rec.recordedAt),
         気温: rec.temperature,
         湿度: rec.humidity,
+    }));
+
+    const pressureData = records.map((rec) => ({
+        time: formatDateTime(rec.recordedAt),
         気圧: rec.pressure,
     }));
 
-    const hasWeather = records.some(
-        (rec) => rec.temperature !== null || rec.humidity !== null || rec.pressure !== null
-    );
+    const hasTempHum = records.some((rec) => rec.temperature !== null || rec.humidity !== null);
+    const hasPressure = records.some((rec) => rec.pressure !== null);
 
     const colorMap = new Map(
         painTypes.map((pt, i) => [pt.id, GRAPH_LINE_COLORS[i % GRAPH_LINE_COLORS.length]])
@@ -201,18 +238,38 @@ export default function PainGraph() {
 
     return (
         <div className="space-y-4">
-            <div className="flex gap-2">
-                {(Object.keys(RANGE_LABELS) as Range[]).map((r) => (
-                    <button
-                        key={r}
-                        onClick={() => setRange(r)}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                            range === r ? 'bg-blue-500 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-                        }`}
-                    >
-                        {RANGE_LABELS[r]}
-                    </button>
-                ))}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex gap-2">
+                    {(Object.keys(RANGE_LABELS) as Range[]).map((r) => (
+                        <button
+                            key={r}
+                            onClick={() => setRange(r)}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                                range === r ? 'bg-blue-500 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                            }`}
+                        >
+                            {RANGE_LABELS[r]}
+                        </button>
+                    ))}
+                </div>
+                {!loading && records.length > 0 && (
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => downloadCsv(records, painTypes, range)}
+                            className="px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-colors"
+                        >
+                            CSVダウンロード
+                        </button>
+                        <a
+                            href={`/print-preview?range=${range}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-colors"
+                        >
+                            印刷・PDF
+                        </a>
+                    </div>
+                )}
             </div>
 
             {painTypes.length > 0 && (
@@ -294,28 +351,43 @@ export default function PainGraph() {
                         </ResponsiveContainer>
                     </div>
 
-                    {/* 気象グラフ */}
-                    {hasWeather && (
+                    {/* 気温・湿度グラフ */}
+                    {hasTempHum && (
                         <div className="bg-white rounded-xl shadow-sm p-4">
-                            <p className="text-xs text-gray-500 mb-1">気温 °C (左軸) / 湿度 % · 気圧 hPa (右軸)</p>
-                            <ResponsiveContainer width="100%" height={220}>
-                                <ComposedChart data={weatherData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                            <p className="text-xs text-gray-500 mb-1">気温 °C (左軸) / 湿度 % (右軸: 0〜100)</p>
+                            <ResponsiveContainer width="100%" height={200}>
+                                <ComposedChart data={tempHumData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                                     <XAxis dataKey="time" tick={{ fontSize: 11 }} />
                                     <YAxis yAxisId="temp" tick={{ fontSize: 11 }} unit="°" />
-                                    <YAxis yAxisId="hum_pres" orientation="right" tick={{ fontSize: 11 }} />
+                                    <YAxis yAxisId="hum" orientation="right" domain={[0, 100]} tick={{ fontSize: 11 }} unit="%" />
                                     <Tooltip
                                         formatter={(value: number, name: string) => {
                                             if (name === '気温') { return [`${value} °C`, name]; }
                                             if (name === '湿度') { return [`${value} %`, name]; }
-                                            if (name === '気圧') { return [`${value} hPa`, name]; }
                                             return [value, name];
                                         }}
                                     />
                                     <Legend />
                                     <Line yAxisId="temp" type="monotone" dataKey="気温" stroke="#f97316" strokeWidth={2} dot={{ r: 3 }} connectNulls />
-                                    <Line yAxisId="hum_pres" type="monotone" dataKey="湿度" stroke="#22d3ee" strokeWidth={2} dot={{ r: 3 }} connectNulls />
-                                    <Line yAxisId="hum_pres" type="monotone" dataKey="気圧" stroke="#a78bfa" strokeWidth={2} dot={{ r: 3 }} connectNulls />
+                                    <Line yAxisId="hum" type="monotone" dataKey="湿度" stroke="#22d3ee" strokeWidth={2} dot={{ r: 3 }} connectNulls />
+                                </ComposedChart>
+                            </ResponsiveContainer>
+                        </div>
+                    )}
+
+                    {/* 気圧グラフ */}
+                    {hasPressure && (
+                        <div className="bg-white rounded-xl shadow-sm p-4">
+                            <p className="text-xs text-gray-500 mb-1">気圧 hPa</p>
+                            <ResponsiveContainer width="100%" height={160}>
+                                <ComposedChart data={pressureData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                                    <XAxis dataKey="time" tick={{ fontSize: 11 }} />
+                                    <YAxis tick={{ fontSize: 11 }} unit=" hPa" width={60} />
+                                    <Tooltip formatter={(value: number) => [`${value} hPa`, '気圧']} />
+                                    <Legend />
+                                    <Line type="monotone" dataKey="気圧" stroke="#a78bfa" strokeWidth={2} dot={{ r: 3 }} connectNulls />
                                 </ComposedChart>
                             </ResponsiveContainer>
 
