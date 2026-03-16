@@ -381,7 +381,7 @@ export default function PainGraph() {
                         <div className="bg-white rounded-xl shadow-sm p-4">
                             <p className="text-xs text-gray-500 mb-1">気圧 hPa</p>
                             <ResponsiveContainer width="100%" height={160}>
-                                <ComposedChart data={pressureData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                                <ComposedChart data={pressureData} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                                     <XAxis dataKey="time" tick={{ fontSize: 11 }} />
                                     <YAxis tick={{ fontSize: 11 }} unit=" hPa" width={60} />
@@ -391,30 +391,6 @@ export default function PainGraph() {
                                 </ComposedChart>
                             </ResponsiveContainer>
 
-                            {/* 気象相関スコア */}
-                            {hasWeatherCorr && (
-                                <div className="mt-3 pt-3 border-t border-gray-100">
-                                    <p className="text-xs font-medium text-gray-500 mb-2">気象と痛みレベルの相関</p>
-                                    <div className="space-y-1">
-                                        {weatherCorr.map(({ key, label, unit, r, n }) => {
-                                            if (r === null) { return null; }
-                                            return (
-                                                <div key={key} className="flex items-center gap-2 text-sm">
-                                                    <span className="text-gray-500 w-10">{label}</span>
-                                                    <span className={`font-mono font-bold ${correlationColor(r)}`}>
-                                                        {r >= 0 ? '+' : ''}{r.toFixed(2)}
-                                                    </span>
-                                                    <span className={`text-xs ${correlationColor(r)}`}>
-                                                        {correlationLabel(r)}
-                                                    </span>
-                                                    <span className="text-xs text-gray-300 ml-auto">{n}件</span>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                    <p className="text-xs text-gray-300 mt-2">r: ピアソン相関係数（-1〜+1）</p>
-                                </div>
-                            )}
                         </div>
                     )}
 
@@ -497,6 +473,31 @@ export default function PainGraph() {
                                         <p className="text-xs text-gray-400">データが3件以上あると計算できます</p>
                                     )}
                                 </div>
+
+                                {/* 気象との相関 */}
+                                {hasWeatherCorr && (
+                                    <div>
+                                        <p className="text-xs font-medium text-gray-500 mb-1">気象との相関</p>
+                                        <div className="space-y-1">
+                                            {weatherCorr.map(({ key, label, unit, r, n }) => {
+                                                if (r === null) { return null; }
+                                                return (
+                                                    <div key={key} className="flex items-center gap-2 text-sm">
+                                                        <span className="text-gray-500 w-10">{label}</span>
+                                                        <span className={`font-mono font-bold ${correlationColor(r)}`}>
+                                                            {r >= 0 ? '+' : ''}{r.toFixed(2)}
+                                                        </span>
+                                                        <span className={`text-xs ${correlationColor(r)}`}>
+                                                            {correlationLabel(r)}
+                                                        </span>
+                                                        <span className="text-xs text-gray-300 ml-auto">{n}件</span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                        <p className="text-xs text-gray-300 mt-1">r: ピアソン相関係数（-1〜+1）</p>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
