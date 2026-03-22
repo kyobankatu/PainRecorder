@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ACTIVITY_LEVELS } from '@/lib/constants';
 
@@ -24,6 +24,9 @@ interface Props {
 
 export default function RecordList({ initialRecords }: Props) {
     const [records, setRecords] = useState(initialRecords);
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => { setMounted(true); }, []);
 
     async function handleDelete(id: string) {
         if (!confirm('この記録を削除しますか？')) { return; }
@@ -45,10 +48,10 @@ export default function RecordList({ initialRecords }: Props) {
                 return (
                     <div key={rec.id} className="bg-white rounded-xl shadow-sm p-4">
                         <div className="flex justify-between items-start">
-                            <div className="text-sm text-gray-500" suppressHydrationWarning>
-                                {date.getFullYear()}/{date.getMonth() + 1}/{date.getDate()}{' '}
-                                {String(date.getHours()).padStart(2, '0')}:
-                                {String(date.getMinutes()).padStart(2, '0')}
+                            <div className="text-sm text-gray-500">
+                                {mounted ? (
+                                    `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+                                ) : ''}
                             </div>
                             <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">
                                 活動量 {rec.activityLevel}: {activity?.label}

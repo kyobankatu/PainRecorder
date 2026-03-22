@@ -192,7 +192,7 @@ export default function RecordForm({ recordId, initialData }: Props) {
             const res = await fetch(recordId ? `/api/records/${recordId}` : '/api/records', {
                 method: recordId ? 'PUT' : 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ activityLevel, comment, recordedAt, painEntries, temperature, humidity, pressure }),
+                body: JSON.stringify({ activityLevel, comment, recordedAt: new Date(recordedAt).toISOString(), painEntries, temperature, humidity, pressure }),
             });
             if (!res.ok) {
                 const data = await res.json();

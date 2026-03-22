@@ -4,3 +4,4 @@
 node_modules/
 *.log
 .DS_Store
+neon_backup.sql
