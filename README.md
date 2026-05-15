@@ -10,7 +10,7 @@
 - **バックエンド:** Next.js API Routes, NextAuth.js v4 (JWT戦略)
 - **データベース:** PostgreSQL 16 + Prisma ORM
 - **認証:** bcryptjs によるパスワードハッシュ化
-- **インフラ:** Docker Compose (開発) / Google Cloud Run (本番)
+- **インフラ:** Docker Compose / Docker / Kubernetes
 - **PWA:** Web App Manifest + Service Worker
 
 ## 機能
@@ -108,6 +108,10 @@ npm run db:studio
 | `DATABASE_URL` | PostgreSQL 接続文字列 |
 | `NEXTAUTH_SECRET` | NextAuth.js の署名・暗号化に使うシークレット |
 | `NEXTAUTH_URL` | アプリのベース URL |
+
+## デプロイ
+
+本番環境では Docker イメージをビルドし、PostgreSQL と接続できる環境でアプリケーションを起動します。具体的なインフラ構成や Secret を含む設定ファイルは、公開リポジトリには含めません。
 
 ## ドメイン仕様
 
