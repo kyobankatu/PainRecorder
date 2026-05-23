@@ -68,6 +68,7 @@ cp .env.example .env
 DATABASE_URL=postgresql://painuser:painpass@db:5432/painrecorder
 NEXTAUTH_SECRET=your-secret-here
 NEXTAUTH_URL=http://localhost:3000
+REGISTRATION_INVITE_CODE=change-this-invite-code
 ```
 
 2. 起動する
@@ -108,6 +109,7 @@ npm run db:studio
 | `DATABASE_URL` | PostgreSQL 接続文字列 |
 | `NEXTAUTH_SECRET` | NextAuth.js の署名・暗号化に使うシークレット |
 | `NEXTAUTH_URL` | アプリのベース URL |
+| `REGISTRATION_INVITE_CODE` | 新規登録に必要な招待コード |
 
 ## デプロイ
 

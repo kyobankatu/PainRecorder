@@ -9,6 +9,7 @@ export default function AuthPage() {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -22,7 +23,7 @@ export default function AuthPage() {
         const res = await fetch('/api/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, password }),
+          body: JSON.stringify({ username, password, inviteCode }),
         });
         if (!res.ok) {
           const data = await res.json();
@@ -95,6 +96,19 @@ export default function AuthPage() {
               placeholder="パスワードを入力"
             />
           </div>
+          {mode === 'register' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">招待コード</label>
+              <input
+                type="password"
+                value={inviteCode}
+                onChange={(e) => setInviteCode(e.target.value)}
+                required
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="招待コードを入力"
+              />
+            </div>
+          )}
 
           {error && <p className="text-red-500 text-sm">{error}</p>}
 
