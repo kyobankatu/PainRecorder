@@ -115,6 +115,8 @@ npm run db:studio
 
 本番環境では Docker イメージをビルドし、PostgreSQL と接続できる環境でアプリケーションを起動します。具体的なインフラ構成や Secret を含む設定ファイルは、公開リポジトリには含めません。
 
+本番起動時には Prisma の `db push` を実行しません。スキーマ変更が必要な場合は、デプロイ前に migration を作成・確認し、本番環境へは `prisma migrate deploy` で適用してください。
+
 ## ドメイン仕様
 
 ### 痛みレベル
