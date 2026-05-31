@@ -6,15 +6,9 @@ const MIN_PASSWORD_LENGTH = 12;
 const BCRYPT_COST = 12;
 
 export async function POST(req: NextRequest) {
-  const { username, password, inviteCode } = await req.json();
+  const { username, password } = await req.json();
   const normalizedUsername = typeof username === 'string' ? username.trim() : '';
 
-  if (!process.env.REGISTRATION_INVITE_CODE) {
-    return NextResponse.json({ error: '新規登録は現在停止されています' }, { status: 403 });
-  }
-  if (inviteCode !== process.env.REGISTRATION_INVITE_CODE) {
-    return NextResponse.json({ error: '招待コードが正しくありません' }, { status: 403 });
-  }
   if (!normalizedUsername || !password) {
     return NextResponse.json({ error: 'ユーザー名とパスワードは必須です' }, { status: 400 });
   }
